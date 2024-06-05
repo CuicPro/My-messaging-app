@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-time Messaging App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="container">
+    <div id="login">
+      <h2>Login</h2>
+      <button id="loginGoogleBtn">Login with Google</button>
+      <form id="loginForm" style="margin-top: 20px; display: none;">
+        <input type="email" id="emailInput" placeholder="Email">
+        <input type="password" id="passwordInput" placeholder="Password">
+        <button type="submit">Login with Email</button>
+      </form>
+    </div>
+    <form id="signupForm" style="display: none;">
+    <input type="email" id="signupEmail" placeholder="Email" required>
+    <input type="password" id="signupPassword" placeholder="Password" required>
+    <button type="submit">Sign Up</button>
+  </form>
+    <div id="profileForm" style="display:none;">
+      <h2>Profile Setup</h2>
+      <input type="file" id="photoInput" accept="image/*" style="margin-bottom: 10px;">
+      <input type="text" id="displayNameInput" placeholder="Display Name" style="margin-bottom: 10px;">
+      <textarea id="descriptionInput" placeholder="Description" style="margin-bottom: 10px;"></textarea>
+      <button id="saveProfileBtn">Save Profile</button>
+    </div>
+    <div id="chat" style="display:none;">
+        <header>
+            <div id="userProfile"></div>
+            <button id="logoutBtn">Logout</button>
+        </header>
+      <div id="messages"></div>
+      <form id="messageForm">
+        <input type="text" id="messageInput" autocomplete="off" placeholder="Type a message...">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDiSV10-EsyFSCYE3sqH4fyDSib_K1IslM",
+      authDomain: "messagerie-c13c9.firebaseapp.com",
+      projectId: "messagerie-c13c9",
+      storageBucket: "messagerie-c13c9.appspot.com",
+      messagingSenderId: "33075375209",
+      appId: "1:33075375209:web:90944619955684bf6286f8",
+      measurementId: "G-W87XEXNC4L"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const firestore = getFirestore(app);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+
+
+    const container = document.getElementById('container');
+    const login = document.getElementById('login');
+    const profileForm = document.getElementById('profileForm');
+    const chat = document.getElementById('chat');
+    const userProfile = document.getElementById('userProfile');
+    const loginGoogleBtn = document.getElementById('loginGoogleBtn');
+    const loginForm = "";//document.getElementById('loginForm');
+    const signupForm = "";//document.getElementById('signupForm');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const messagesDiv = document.getElementById('messages');
+    const photoInput = document.getElementById('photoInput');
+    const displayNameInput = document.getElementById('displayNameInput');
+    const descriptionInput = document.getElementById('descriptionInput');
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+
+    let currentUser = null;
+
+    // Login with Google
+    loginGoogleBtn.addEventListener('click', async () => {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.error("Error during sign in with Google:", error);
+      }
+    });
+
+      // Gestionnaire d'événement pour le formulaire d'inscription
+//   signupForm.addEventListener('submit', async (e) => {
+//     e.preventDefault();
+//     const email = document.getElementById('signupEmail').value;
+//     const password = document.getElementById('signupPassword').value;
+//     try {
+//       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+//       // Inscription réussie, vous pouvez rediriger l'utilisateur vers une page de connexion ou effectuer d'autres actions nécessaires.
+//     } catch (error) {
+//       console.error("Error during sign up:", error);
+//       // Gérer l'erreur d'inscription ici
+//     }
+//   });
+//     // Login with email and password
+//     loginForm.addEventListener('submit', async (e) => {
+//       e.preventDefault();
+//       const email = emailInput.value;
+//       const password = passwordInput.value;
+//       try {
+//         await signInWithEmailAndPassword(auth, email, password);
+//       } catch (error) {
+//         console.error("Error during sign in with email:", error);
+//       }
+//     });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+      await signOut(auth);
+    });
+
+    auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUser = user;
+    login.style.display = 'none';
+    
+    if (user.displayName) {
+      profileForm.style.display = 'none'; // Cacher le formulaire de profil
+        //   signupForm.style.display = "none";
+      chat.style.display = 'flex';
+      loadMessages();
+    } else {
+      profileForm.style.display = 'block';
+      chat.style.display = 'none';
+      container.style.background = 'none';
+    }
+    userProfile.textContent = `Logged in as: ${user.displayName || 'Unknown'}`;
+  } else {
+    currentUser = null;
+    login.style.display = 'flex';
+    profileForm.style.display = 'none';
+    chat.style.display = 'none';
+    container.style.background = 'none';
+  }
+});
+
+
+saveProfileBtn.addEventListener('click', async () => {
+  const displayName = displayNameInput.value.trim();
+  const description = descriptionInput.value.trim();
+  const file = photoInput.files[0]; // Récupère le fichier de la photo de profil
+
+  try {
+    let photoURL = null;
+    if (file) {
+      // Télécharger la photo de profil sur le stockage Firebase
+      const storageRef = ref(storage, `profilePictures/${currentUser.uid}/${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      photoURL = await getDownloadURL(snapshot.ref);
+    }
+
+    if (!currentUser.providerData.some(provider => provider.providerId === 'google.com')) {
+      // Si l'utilisateur n'est pas connecté avec Google, mettre à jour le nom d'affichage
+      await updateProfile(auth.currentUser, { displayName: displayName });
+    }
+
+    // Mettre à jour les autres informations du profil avec la photo de profil si disponible
+    await updateProfile(auth.currentUser, {
+      displayName: displayName,
+      photoURL: photoURL,
+    });
+
+    // Enregistrer les autres informations dans la base de données
+    await addDoc(collection(firestore, 'users'), {
+      uid: currentUser.uid,
+      displayName: displayName,
+      description: description,
+      photoURL: photoURL,
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+  }
+});
+
+
+
+// Envoyer un message
+messageForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  console.log('user', currentUser)
+  console.log("displayName:", currentUser.displayName);
+  console.log("photoURL:", currentUser.photoURL);
+  
+  const messageText = messageInput.value.trim();
+  if (messageText && currentUser.displayName && currentUser.photoURL) {
+    await addDoc(collection(firestore, 'messages'), {
+      text: messageText,
+      createdAt: serverTimestamp(),
+      uid: auth.currentUser.uid,
+      displayName: currentUser.displayName,
+      photoURL: currentUser.photoURL
+    });
+    messageInput.value = '';
+  } else {
+    alert("Please set up your profile before sending messages.");
+    profileForm.style.display = "block";
+  }
+});
+
+
+    // Charger les messages
+    const loadMessages = () => {
+      const q = query(collection(firestore, 'messages'), orderBy('createdAt'));
+      onSnapshot(q, (snapshot) => {
+        messagesDiv.innerHTML = '';
+        snapshot.forEach((doc) => {
+          const message = doc.data();
+          const messageElement = document.createElement('div');
+          messageElement.innerHTML = `<img src="${message.photoURL || 'placeholder.jpg'}" alt="Profile Picture" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;"> <strong>${message.displayName || 'Unknown User'}:</strong> ${message.text}`;
+          messagesDiv.appendChild(messageElement);
+        });
+      });
+    };
+  </script>
+</body>
+</html>
