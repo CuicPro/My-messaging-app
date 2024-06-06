@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Real-time Messaging App</title>
   <link rel="stylesheet" href="style.css">
+
+
+  <!-- <script src="firebase-messaging-sw.js" defer></script> -->
+
 </head>
 <body>
   <div id="container">
@@ -18,10 +22,10 @@
       </form>
     </div>
     <form id="signupForm" style="display: none;">
-    <input type="email" id="signupEmail" placeholder="Email" required>
-    <input type="password" id="signupPassword" placeholder="Password" required>
-    <button type="submit">Sign Up</button>
-  </form>
+      <input type="email" id="signupEmail" placeholder="Email" required>
+      <input type="password" id="signupPassword" placeholder="Password" required>
+      <button type="submit">Sign Up</button>
+    </form>
     <div id="profileForm" style="display:none;">
       <h2>Profile Setup</h2>
       <input type="file" id="photoInput" accept="image/*" style="margin-bottom: 10px;">
@@ -32,7 +36,10 @@
     <div id="chat" style="display:none;">
         <header>
             <div id="userProfile"></div>
-            <button id="logoutBtn">Logout</button>
+            <div>
+                <button id="logoutBtn">Logout</button>
+                <button id="enableNotificationsBtn">🔔</button>
+            </div>
         </header>
       <div id="messages"></div>
       <form id="messageForm">
@@ -43,13 +50,12 @@
   </div>
 
   <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
-
-    // Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyDiSV10-EsyFSCYE3sqH4fyDSib_K1IslM",
       authDomain: "messagerie-c13c9.firebaseapp.com",
@@ -60,12 +66,13 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
       measurementId: "G-W87XEXNC4L"
     };
 
-    // Initialize Firebase
+
+
     const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
     const firestore = getFirestore(app);
     const auth = getAuth(app);
     const storage = getStorage(app);
-
 
     const container = document.getElementById('container');
     const login = document.getElementById('login');
@@ -73,8 +80,8 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
     const chat = document.getElementById('chat');
     const userProfile = document.getElementById('userProfile');
     const loginGoogleBtn = document.getElementById('loginGoogleBtn');
-    const loginForm = "";//document.getElementById('loginForm');
-    const signupForm = "";//document.getElementById('signupForm');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
     const emailInput = document.getElementById('emailInput');
     const passwordInput = document.getElementById('passwordInput');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -88,7 +95,6 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
 
     let currentUser = null;
 
-    // Login with Google
     loginGoogleBtn.addEventListener('click', async () => {
       const provider = new GoogleAuthProvider();
       try {
@@ -128,14 +134,13 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
       await signOut(auth);
     });
 
-    auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
     login.style.display = 'none';
     
     if (user.displayName) {
-      profileForm.style.display = 'none'; // Cacher le formulaire de profil
-        //   signupForm.style.display = "none";
+      profileForm.style.display = 'none';
       chat.style.display = 'flex';
       loadMessages();
     } else {
@@ -144,6 +149,18 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
       container.style.background = 'none';
     }
     userProfile.textContent = `Logged in as: ${user.displayName || 'Unknown'}`;
+
+    // Maintenant que l'utilisateur est connecté, vous pouvez accéder à currentUser en toute sécurité.
+    // Placez le code qui utilise currentUser ici.
+    try {
+      const currentToken = await getToken(messaging, { vapidKey: 'BPCsYpUabhuMR2CsCt9b7-Le6CEj6qbzb-hzCW2HaPuzN7g8De7tw0_ebUdULtFoqLP0_p97BvrqjQB46nOGxqw' });
+      if (currentToken) {
+        console.log('Current token:', currentToken);
+        await addDoc(collection(firestore, 'tokens'), { token: currentToken, uid: currentUser.uid });
+      }
+    } catch (error) {
+      console.error('Error obtaining token:', error);
+    }
   } else {
     currentUser = null;
     login.style.display = 'flex';
@@ -152,6 +169,46 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
     container.style.background = 'none';
   }
 });
+
+
+
+
+
+const requestNotificationPermission = async () => {
+  try {
+    await Notification.requestPermission();
+    console.log('Notification permission granted.');
+
+    // Obtenir le token FCM
+    const currentToken = await getToken(messaging, { vapidKey: 'BPCsYpUabhuMR2CsCt9b7-Le6CEj6qbzb-hzCW2HaPuzN7g8De7tw0_ebUdULtFoqLP0_p97BvrqjQB46nOGxqw' });
+    if (currentToken) {
+      console.log('Current token:', currentToken);
+      // Envoyer le token au serveur pour l'utiliser dans les notifications
+    } else {
+      console.log('No registration token available. Request permission to generate one.');
+    }
+  } catch (error) {
+    console.error('Unable to get permission to notify.', error);
+  }
+};
+
+
+    const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
+    enableNotificationsBtn.addEventListener('click', requestNotificationPermission);
+
+// Gestionnaire pour les messages reçus
+onMessage(messaging, (payload) => {
+  console.log('Message received. ', payload);
+  // Personnaliser la notification ici
+  new Notification(payload.notification.title, {
+    body: payload.notification.body,
+    icon: payload.notification.icon
+  });
+});
+
+
+
+
 
 
 saveProfileBtn.addEventListener('click', async () => {
@@ -230,6 +287,9 @@ messageForm.addEventListener('submit', async (e) => {
         });
       });
     };
+
+
+
   </script>
 </body>
 </html>
