@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Real-time Messaging App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon.jpg" type="image/icon type">    
 
 
   <!-- <script src="firebase-messaging-sw.js" defer></script> -->
@@ -381,6 +382,25 @@ messageForm.addEventListener('submit', async (e) => {
   }
 });
 
+
+const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
+
+enableNotificationsBtn.addEventListener('click', async () => {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY' });
+      console.log('Notification token:', token);
+      // Vous pouvez envoyer ce token à votre serveur pour enregistrer cet utilisateur pour des notifications push
+      alert('Notifications enabled!');
+    } else {
+      alert('Notifications permission denied');
+    }
+  } catch (error) {
+    console.error('Error enabling notifications:', error);
+  }
+});
 
 
 
