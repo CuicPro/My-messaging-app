@@ -10,6 +10,17 @@
 
   <!-- <script src="firebase-messaging-sw.js" defer></script> -->
   <link rel="manifest" href="manifest.json">
+
+
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "1938b348-ccd7-497e-850e-2a367ea568d1",
+    });
+  });
+</script>
 </head>
 <body>
   <div id="container">
@@ -193,6 +204,34 @@ saveProfileBtn.addEventListener('click', async () => {
   }
 });
 
+
+
+
+
+
+// Fonction pour envoyer une notification avec OneSignal
+async function sendNotification(message) {
+  try {
+    await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'NWRjZDI4ZDItYTNkOS00OTdkLWE3NjQtMWQ1YTRjYmYwMjZl' // Remplacez YOUR_REST_API_KEY par votre clé API OneSignal REST
+      },
+      body: JSON.stringify({
+        app_id: '1938b348-ccd7-497e-850e-2a367ea568d1', // Remplacez YOUR_APP_ID par l'identifiant de votre application OneSignal
+        included_segments: ['All Users'], // Envoyer la notification à tous les utilisateurs
+        data: { message: message }, // Données supplémentaires à envoyer avec la notification
+        contents: { en: 'New message received!' }, // Contenu de la notification
+      })
+    });
+    console.log('Notification sent successfully.');
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+}
+
+
 // Envoyer un message
 messageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -205,6 +244,9 @@ messageForm.addEventListener('submit', async (e) => {
       displayName: currentUser.displayName,
       photoURL: currentUser.photoURL
     };
+
+    // Envoyer une notification aux autres utilisateurs
+    await sendNotification(messageText);
     
     if (isOnline()) {
       await addDoc(collection(firestore, 'messages'), message);
