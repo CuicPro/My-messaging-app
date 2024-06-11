@@ -127,38 +127,6 @@ setTimeout(function() {
       }
     });
 
-
-
-      // Gestionnaire d'événement pour le formulaire d'inscription
-//   signupForm.addEventListener('submit', async (e) => {
-//     e.preventDefault();
-//     const email = document.getElementById('signupEmail').value;
-//     const password = document.getElementById('signupPassword').value;
-//     try {
-//       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-//       // Inscription réussie, vous pouvez rediriger l'utilisateur vers une page de connexion ou effectuer d'autres actions nécessaires.
-//     } catch (error) {
-//       console.error("Error during sign up:", error);
-//       // Gérer l'erreur d'inscription ici
-//     }
-//   });
-//     // Login with email and password
-//     loginForm.addEventListener('submit', async (e) => {
-//       e.preventDefault();
-//       const email = emailInput.value;
-//       const password = passwordInput.value;
-//       try {
-//         await signInWithEmailAndPassword(auth, email, password);
-//       } catch (error) {
-//         console.error("Error during sign in with email:", error);
-//       }
-//     });
-
-    // Logout
-    logoutBtn.addEventListener('click', async () => {
-      await signOut(auth);
-    });
-
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentUser = user;
@@ -225,24 +193,27 @@ saveProfileBtn.addEventListener('click', async () => {
   }
 });
 
-
-
 // Envoyer un message
 messageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  console.log('user', currentUser)
-  console.log("displayName:", currentUser.displayName);
-  console.log("photoURL:", currentUser.photoURL);
-  
   const messageText = messageInput.value.trim();
   if (messageText && currentUser.displayName && currentUser.photoURL) {
-    await addDoc(collection(firestore, 'messages'), {
+    const message = {
       text: messageText,
       createdAt: serverTimestamp(),
       uid: auth.currentUser.uid,
       displayName: currentUser.displayName,
       photoURL: currentUser.photoURL
-    });
+    };
+    
+    if (isOnline()) {
+      await addDoc(collection(firestore, 'messages'), message);
+    } else {
+      if (savePendingMessage(message)) {
+        alert("Vous êtes hors connexion. Votre message sera envoyé lorsque la connexion sera rétablie.");
+      }
+    }
+    
     messageInput.value = '';
   } else {
     alert("Please set up your profile before sending messages.");
@@ -250,8 +221,10 @@ messageForm.addEventListener('submit', async (e) => {
   }
 });
 
-
-    // Charger les messages
+// Gestionnaire d'événement pour le bouton de déconnexion
+logoutBtn.addEventListener('click', async () => {
+  await signOut(auth);
+});
 // Charger les messages
 const loadMessages = () => {
   const q = query(collection(firestore, 'messages'), orderBy('createdAt'));
@@ -272,6 +245,7 @@ const loadMessages = () => {
 
 // Vérifier la connexion réseau
 function isOnline() {
+  console.log('functoin isOnline')
   return navigator.onLine;
 }
 
@@ -303,6 +277,7 @@ function sendPendingMessages() {
 window.addEventListener('load', () => {
   if (isOnline()) {
     sendPendingMessages();
+    console.log('hors co');
   }
 });
 
@@ -310,78 +285,6 @@ window.addEventListener('load', () => {
 window.addEventListener('online', () => {
   sendPendingMessages();
 });
-
-// Envoyer un message
-messageForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const messageText = messageInput.value.trim();
-  if (messageText && currentUser.displayName && currentUser.photoURL) {
-    const message = {
-      text: messageText,
-      createdAt: serverTimestamp(),
-      uid: auth.currentUser.uid,
-      displayName: currentUser.displayName,
-      photoURL: currentUser.photoURL
-    };
-    
-    if (isOnline()) {
-      await addDoc(collection(firestore, 'messages'), message);
-    } else {
-      if (savePendingMessage(message)) {
-        alert("Vous êtes hors connexion. Votre message sera envoyé lorsque la connexion sera rétablie.");
-      }
-    }
-    
-    messageInput.value = '';
-  } else {
-    alert("Please set up your profile before sending messages.");
-    profileForm.style.display = "block";
-  }
-});
-
-
-
-const statusMessage = document.getElementById('statusMessage');
-
-window.addEventListener('online', () => {
-  statusMessage.style.display = 'none';
-  sendPendingMessages();
-});
-
-window.addEventListener('offline', () => {
-  statusMessage.textContent = 'Vous êtes hors connexion. Les messages envoyés seront mis en attente.';
-  statusMessage.style.display = 'block';
-});
-
-messageForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const messageText = messageInput.value.trim();
-  if (messageText && currentUser.displayName && currentUser.photoURL) {
-    const message = {
-      text: messageText,
-      createdAt: serverTimestamp(),
-      uid: auth.currentUser.uid,
-      displayName: currentUser.displayName,
-      photoURL: currentUser.photoURL
-    };
-
-    if (isOnline()) {
-      await addDoc(collection(firestore, 'messages'), message);
-    } else {
-      if (savePendingMessage(message)) {
-        alert("Vous êtes hors connexion. Votre message sera envoyé lorsque la connexion sera rétablie.");
-        statusMessage.textContent = 'Vous êtes hors connexion. Les messages envoyés seront mis en attente.';
-        statusMessage.style.display = 'block';
-      }
-    }
-
-    messageInput.value = '';
-  } else {
-    alert("Please set up your profile before sending messages.");
-    profileForm.style.display = "block";
-  }
-});
-
 
 // const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
 
@@ -406,7 +309,7 @@ messageForm.addEventListener('submit', async (e) => {
 
 setTimeout(function() {
   if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js')
+  navigator.serviceWorker.register('service-worker.js')
     .then((registration) => {
       console.log('Service Worker registered with scope:', registration.scope);
     })
