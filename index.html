@@ -8,7 +8,7 @@
 
 
   <!-- <script src="firebase-messaging-sw.js" defer></script> -->
-
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
   <div id="container">
@@ -35,7 +35,10 @@
     </div>
     <div id="chat" style="display:none;">
         <header>
-            <div id="userProfile"></div>
+            <div>
+              <div id="userProfile"></div>
+              <div id="statusMessage" style="display: none; color: red; text-align: center; margin-top: 10px;"></div>
+            </div>
             <div>
                 <button id="logoutBtn">Logout</button>
                 <button id="enableNotificationsBtn">🔔</button>
@@ -49,8 +52,26 @@
     </div>
   </div>
 
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+// Fonction pour défiler jusqu'en bas de la page
+function scrollToBottom() {
+    // Obtenir la hauteur totale de la page
+    var pageHeight = document.documentElement.scrollHeight;
+
+    // Faire défiler jusqu'en bas de la page
+    window.scrollTo(0, pageHeight);
+}
+
+setTimeout(function() {
+  scrollToBottom();
+}, 1000)
+// Appeler la fonction pour défiler jusqu'en bas
+});
+  </script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
@@ -69,6 +90,7 @@
 
 
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const messaging = getMessaging(app);
     const firestore = getFirestore(app);
     const auth = getAuth(app);
@@ -103,6 +125,8 @@
         console.error("Error during sign in with Google:", error);
       }
     });
+
+
 
       // Gestionnaire d'événement pour le formulaire d'inscription
 //   signupForm.addEventListener('submit', async (e) => {
@@ -150,17 +174,6 @@ auth.onAuthStateChanged(async (user) => {
     }
     userProfile.textContent = `Logged in as: ${user.displayName || 'Unknown'}`;
 
-    // Maintenant que l'utilisateur est connecté, vous pouvez accéder à currentUser en toute sécurité.
-    // Placez le code qui utilise currentUser ici.
-    try {
-      const currentToken = await getToken(messaging, { vapidKey: 'BPCsYpUabhuMR2CsCt9b7-Le6CEj6qbzb-hzCW2HaPuzN7g8De7tw0_ebUdULtFoqLP0_p97BvrqjQB46nOGxqw' });
-      if (currentToken) {
-        console.log('Current token:', currentToken);
-        await addDoc(collection(firestore, 'tokens'), { token: currentToken, uid: currentUser.uid });
-      }
-    } catch (error) {
-      console.error('Error obtaining token:', error);
-    }
   } else {
     currentUser = null;
     login.style.display = 'flex';
@@ -169,43 +182,6 @@ auth.onAuthStateChanged(async (user) => {
     container.style.background = 'none';
   }
 });
-
-
-
-
-
-const requestNotificationPermission = async () => {
-  try {
-    await Notification.requestPermission();
-    console.log('Notification permission granted.');
-
-    // Obtenir le token FCM
-    const currentToken = await getToken(messaging, { vapidKey: 'BPCsYpUabhuMR2CsCt9b7-Le6CEj6qbzb-hzCW2HaPuzN7g8De7tw0_ebUdULtFoqLP0_p97BvrqjQB46nOGxqw' });
-    if (currentToken) {
-      console.log('Current token:', currentToken);
-      // Envoyer le token au serveur pour l'utiliser dans les notifications
-    } else {
-      console.log('No registration token available. Request permission to generate one.');
-    }
-  } catch (error) {
-    console.error('Unable to get permission to notify.', error);
-  }
-};
-
-
-    const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
-    enableNotificationsBtn.addEventListener('click', requestNotificationPermission);
-
-// Gestionnaire pour les messages reçus
-onMessage(messaging, (payload) => {
-  console.log('Message received. ', payload);
-  // Personnaliser la notification ici
-  new Notification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: payload.notification.icon
-  });
-});
-
 
 
 
@@ -275,18 +251,151 @@ messageForm.addEventListener('submit', async (e) => {
 
 
     // Charger les messages
-    const loadMessages = () => {
-      const q = query(collection(firestore, 'messages'), orderBy('createdAt'));
-      onSnapshot(q, (snapshot) => {
-        messagesDiv.innerHTML = '';
-        snapshot.forEach((doc) => {
-          const message = doc.data();
-          const messageElement = document.createElement('div');
-          messageElement.innerHTML = `<img src="${message.photoURL || 'placeholder.jpg'}" alt="Profile Picture" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;"> <strong>${message.displayName || 'Unknown User'}:</strong> ${message.text}`;
-          messagesDiv.appendChild(messageElement);
-        });
-      });
+// Charger les messages
+const loadMessages = () => {
+  const q = query(collection(firestore, 'messages'), orderBy('createdAt'));
+  onSnapshot(q, (snapshot) => {
+    messagesDiv.innerHTML = '';
+    snapshot.forEach((doc) => {
+      const message = doc.data();
+      const messageElement = document.createElement('div');
+      messageElement.innerHTML = `
+        <img src="${message.photoURL || 'placeholder.jpg'}" alt="Profile Picture" 
+             style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px;">
+        <strong>${message.displayName || 'Unknown User'}:</strong> ${message.text}`;
+      messagesDiv.appendChild(messageElement);
+    });
+  });
+};
+
+
+// Vérifier la connexion réseau
+function isOnline() {
+  return navigator.onLine;
+}
+
+// Enregistrer les messages en attente dans le localStorage
+function savePendingMessage(message) {
+  let pendingMessages = JSON.parse(localStorage.getItem('pendingMessages')) || [];
+  if (pendingMessages.length < 3) {
+    pendingMessages.push(message);
+    localStorage.setItem('pendingMessages', JSON.stringify(pendingMessages));
+    return true;
+  } else {
+    alert("Vous ne pouvez envoyer que 3 messages hors connexion.");
+    return false;
+  }
+}
+
+// Envoyer les messages en attente dès que la connexion est rétablie
+function sendPendingMessages() {
+  let pendingMessages = JSON.parse(localStorage.getItem('pendingMessages')) || [];
+  if (pendingMessages.length > 0) {
+    pendingMessages.forEach(async (message) => {
+      await addDoc(collection(firestore, 'messages'), message);
+    });
+    localStorage.removeItem('pendingMessages');
+  }
+}
+
+// Vérifier la connexion réseau au chargement de la page
+window.addEventListener('load', () => {
+  if (isOnline()) {
+    sendPendingMessages();
+  }
+});
+
+// Envoyer les messages en attente lorsqu'on passe hors ligne à en ligne
+window.addEventListener('online', () => {
+  sendPendingMessages();
+});
+
+// Envoyer un message
+messageForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const messageText = messageInput.value.trim();
+  if (messageText && currentUser.displayName && currentUser.photoURL) {
+    const message = {
+      text: messageText,
+      createdAt: serverTimestamp(),
+      uid: auth.currentUser.uid,
+      displayName: currentUser.displayName,
+      photoURL: currentUser.photoURL
     };
+    
+    if (isOnline()) {
+      await addDoc(collection(firestore, 'messages'), message);
+    } else {
+      if (savePendingMessage(message)) {
+        alert("Vous êtes hors connexion. Votre message sera envoyé lorsque la connexion sera rétablie.");
+      }
+    }
+    
+    messageInput.value = '';
+  } else {
+    alert("Please set up your profile before sending messages.");
+    profileForm.style.display = "block";
+  }
+});
+
+
+
+const statusMessage = document.getElementById('statusMessage');
+
+window.addEventListener('online', () => {
+  statusMessage.style.display = 'none';
+  sendPendingMessages();
+});
+
+window.addEventListener('offline', () => {
+  statusMessage.textContent = 'Vous êtes hors connexion. Les messages envoyés seront mis en attente.';
+  statusMessage.style.display = 'block';
+});
+
+messageForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const messageText = messageInput.value.trim();
+  if (messageText && currentUser.displayName && currentUser.photoURL) {
+    const message = {
+      text: messageText,
+      createdAt: serverTimestamp(),
+      uid: auth.currentUser.uid,
+      displayName: currentUser.displayName,
+      photoURL: currentUser.photoURL
+    };
+
+    if (isOnline()) {
+      await addDoc(collection(firestore, 'messages'), message);
+    } else {
+      if (savePendingMessage(message)) {
+        alert("Vous êtes hors connexion. Votre message sera envoyé lorsque la connexion sera rétablie.");
+        statusMessage.textContent = 'Vous êtes hors connexion. Les messages envoyés seront mis en attente.';
+        statusMessage.style.display = 'block';
+      }
+    }
+
+    messageInput.value = '';
+  } else {
+    alert("Please set up your profile before sending messages.");
+    profileForm.style.display = "block";
+  }
+});
+
+
+
+
+setTimeout(function() {
+  if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js')
+    .then((registration) => {
+      console.log('Service Worker registered with scope:', registration.scope);
+    })
+    .catch((error) => {
+      console.log('Service Worker registration failed:', error);
+    });
+}
+
+},10000);
 
 
 

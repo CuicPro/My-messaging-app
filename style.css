@@ -78,7 +78,7 @@ body{
                 justify-content: flex-end;
                 row-gap: 20px;
                 flex: 1;
-                padding: calc(10% + 10px) 10px;
+                padding: calc(10% + 30px) 10px;
                 width: 100%;
             }
             & #messageForm{
