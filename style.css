@@ -28,6 +28,7 @@ body{
             flex-direction: column;
             row-gap: 10px;
             & button{
+                cursor: pointer;
                 height: 40px;
                 padding: 10px 20px;
                 border-radius: 5px;
